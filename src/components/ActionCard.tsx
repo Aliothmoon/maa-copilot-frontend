@@ -1,6 +1,7 @@
 import { Card, Elevation } from '@blueprintjs/core'
 
 import clsx from 'clsx'
+import { useAtomValue } from 'jotai'
 import { FC, ReactNode } from 'react'
 import { FCC } from 'types'
 
@@ -9,8 +10,12 @@ import { FactItem } from 'components/FactItem'
 import { CopilotDocV1 } from 'models/copilot.schema'
 import { findActionType } from 'models/types'
 
-import { useTranslation } from '../i18n/i18n'
-import { findOperatorDirection, getSkillUsageTitle } from '../models/operator'
+import { languageAtom, useTranslation } from '../i18n/i18n'
+import {
+  findOperatorDirection,
+  getLocalizedOperatorName,
+  getSkillUsageTitle,
+} from '../models/operator'
 import { formatDuration } from '../utils/times'
 
 interface ActionCardProps {
@@ -25,6 +30,7 @@ export const ActionCard: FC<ActionCardProps> = ({
   title,
 }) => {
   const t = useTranslation()
+  const language = useAtomValue(languageAtom)
   const type = findActionType(action.type)
 
   title ??= (
@@ -47,7 +53,7 @@ export const ActionCard: FC<ActionCardProps> = ({
           {'name' in action && action.name && (
             <FactItem
               dense
-              title={action.name}
+              title={getLocalizedOperatorName(action.name, language)}
               icon="mugshot"
               className="font-bold"
             />
@@ -113,7 +119,9 @@ export const ActionCard: FC<ActionCardProps> = ({
           {action.preDelay ? formatDuration(action.preDelay) : '-'}
         </InlineCondition>
         <InlineCondition title={t.components.ActionCard.rear_delay}>
-          {action.rearDelay ? formatDuration(action.rearDelay) : '-'}
+          {action.rearDelay || action.postDelay
+            ? formatDuration(action.rearDelay || action.postDelay!)
+            : '-'}
         </InlineCondition>
       </div>
     </Card>

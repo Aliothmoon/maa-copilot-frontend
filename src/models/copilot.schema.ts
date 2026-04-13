@@ -5,7 +5,10 @@ import { OpDifficulty } from './operation'
  * https://maa.plus/docs/zh-cn/protocol/copilot-schema.html
  */
 export namespace CopilotDocV1 {
+  export const VERSION = 3
+
   export interface Operation {
+    version?: number
     actions?: Action[]
     doc: Doc
     groups?: Group[]
@@ -33,6 +36,7 @@ export namespace CopilotDocV1 {
     cooling?: number
     preDelay?: number
     rearDelay?: number
+    postDelay?: number
   }
 
   export interface ActionDeploy extends ActionBase {
@@ -63,6 +67,7 @@ export namespace CopilotDocV1 {
     )
 
   export interface ActionSkillUsage extends ActionBase {
+    name: string
     skillUsage: SkillUsageType
     type: Type.SkillUsage
     skillTimes?: number
@@ -85,11 +90,11 @@ export namespace CopilotDocV1 {
     | ActionMoveCamera
 
   export enum Direction {
-    Down = 'Down',
     Left = 'Left',
-    None = 'None',
     Right = 'Right',
     Up = 'Up',
+    Down = 'Down',
+    None = 'None',
   }
 
   export enum Type {
@@ -161,8 +166,20 @@ export namespace CopilotDocV1 {
   export interface Requirements {
     elite?: number
     level?: number
-    module?: number
+    module?: Module
     potentiality?: number
     skillLevel?: number
+  }
+
+  export enum Module {
+    /** 默认值，不做任何操作 */
+    Default = -1,
+    /** 切换为初始模组 */
+    Original = 0,
+    /** 切换为对应的模组 */
+    X = 1,
+    Y = 2,
+    A = 3,
+    D = 4,
   }
 }

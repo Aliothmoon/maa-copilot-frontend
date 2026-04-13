@@ -1,6 +1,7 @@
 import {
   Button,
   ButtonGroup,
+  Callout,
   Card,
   Collapse,
   Elevation,
@@ -12,6 +13,7 @@ import {
   MenuDivider,
   MenuItem,
   NonIdealState,
+  Switch,
   Tag,
 } from '@blueprintjs/core'
 import { Popover2, Tooltip2 } from '@blueprintjs/popover2'
@@ -39,7 +41,6 @@ import { RelativeTime } from 'components/RelativeTime'
 import { withSuspensable } from 'components/Suspensable'
 import { AppToaster } from 'components/Toaster'
 import { DrawerLayout } from 'components/drawer/DrawerLayout'
-import { OperatorAvatar } from 'components/editor/operator/EditorOperator'
 import { EDifficultyLevel } from 'components/entity/ELevel'
 import { OperationRating } from 'components/viewer/OperationRating'
 import { OpRatingType, Operation } from 'models/operation'
@@ -51,11 +52,22 @@ import { i18nDefer, useTranslation } from '../../i18n/i18n'
 import { CopilotDocV1 } from '../../models/copilot.schema'
 import { createCustomLevel, findLevelByStageName } from '../../models/level'
 import { Level } from '../../models/operation'
-import { OPERATORS, useLocalizedOperatorName } from '../../models/operator'
+import {
+  OPERATORS,
+  getEliteIconUrl,
+  getModuleName,
+  getSkillCount,
+  useLocalizedOperatorName,
+  withDefaultRequirements,
+} from '../../models/operator'
+import { gridModeAtom } from '../../store/pref'
 import { formatError } from '../../utils/error'
 import { ActionCard } from '../ActionCard'
+import { ActionTimelineItem } from '../ActionTimelineItem'
 import { Confirm } from '../Confirm'
-import { ReLink } from '../ReLink'
+import { MasteryIcon } from '../MasteryIcon'
+import { OperatorAvatar } from '../OperatorAvatar'
+import { ReLinkRenderer } from '../ReLink'
 import { UserName } from '../UserName'
 import { CommentArea } from './comment/CommentArea'
 
@@ -104,19 +116,30 @@ const ManageMenu: FC<{
   return (
     <>
       <Menu>
-        <li>
-          <ReLink
-            className="hover:text-inherit hover:no-underline"
-            to={`/create/${operation.id}`}
-            target="_blank"
-          >
+        <ReLinkRenderer
+          className="hover:text-inherit hover:no-underline"
+          to={`/create/${operation.id}`}
+          target="_blank"
+          render={({ className, ...props }) => (
             <MenuItem
-              tagName="div"
               icon="edit"
               text={t.components.viewer.OperationViewer.modify_task}
+              {...props}
             />
-          </ReLink>
-        </li>
+          )}
+        />
+        <ReLinkRenderer
+          className="hover:text-inherit hover:no-underline"
+          to={`/editor/${operation.id}`}
+          target="_blank"
+          render={({ className, ...props }) => (
+            <MenuItem
+              icon="edit"
+              text={t.components.viewer.OperationViewer.modify_task_v2}
+              {...props}
+            />
+          )}
+        />
         {operation.commentStatus === BanCommentsStatusEnum.Enabled && (
           <Confirm
             intent="danger"
@@ -175,6 +198,50 @@ const ManageMenu: FC<{
         </Confirm>
       </Menu>
     </>
+  )
+}
+
+const GridTimeline: FC<{
+  actions: CopilotDocV1.Action[]
+  groups?: CopilotDocV1.Group[]
+}> = ({ actions, groups }) => {
+  return (
+    <div className="mt-4 pb-8">
+      <div
+        className={clsx(
+          // 响应式网格布局, 根据屏幕宽度自动切换列数(1列 -> 2列 -> 3列 -> 4列)
+          'grid gap-x-6 gap-y-7 sm:gap-y-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+
+          // 移动端单列模式: 将连接箭头旋转90度朝下, 并移动到卡片底部中心
+          'max-md:[&_.timeline-arrow]:!rotate-90 max-md:[&_.timeline-arrow]:!-bottom-5 max-md:[&_.timeline-arrow]:!left-1/2 max-md:[&_.timeline-arrow]:!-translate-x-1/2 max-md:[&_.timeline-arrow]:!top-auto max-md:[&_.timeline-arrow]:!right-auto max-md:[&_.timeline-arrow]:!translate-y-0',
+
+          // md断点: 双列模式, 隐藏每行末尾(偶数项)的右侧箭头
+          'md:[&>div:nth-child(2n)_.timeline-arrow]:!hidden',
+
+          // lg断点: 三列模式, 先恢复上一个断点隐藏的箭头, 再隐藏每行末尾(3的倍数项)的右侧箭头
+          'lg:[&>div:nth-child(2n)_.timeline-arrow]:!flex lg:[&>div:nth-child(3n)_.timeline-arrow]:!hidden',
+
+          // xl断点: 四列模式, 先恢复上一个断点隐藏的箭头, 再隐藏每行末尾(4的倍数项)的右侧箭头
+          'xl:[&>div:nth-child(3n)_.timeline-arrow]:!flex xl:[&>div:nth-child(4n)_.timeline-arrow]:!hidden',
+
+          // 无论在什么断点下, 永远隐藏最后一个卡片的箭头
+          '[&>div:last-child_.timeline-arrow]:!hidden',
+        )}
+      >
+        {actions.map((action, idx) => (
+          <div key={idx} className="relative w-full z-10 transition-transform">
+            <ActionTimelineItem
+              index={idx}
+              action={action}
+              isLast={idx === actions.length - 1}
+              groups={groups}
+              grid={true} // use true just to activate card style
+              showArrow={idx !== actions.length - 1}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -316,24 +383,108 @@ export const OperationViewer: ComponentType<{
 
 const OperatorCard: FC<{
   operator: CopilotDocV1.Operator
-}> = ({ operator }) => {
+  version?: number
+}> = ({ operator, version = 1 }) => {
   const t = useTranslation()
-  const { name, skill } = operator
-  const info = OPERATORS.find((o) => o.name === name)
+  const displayName = useLocalizedOperatorName(operator.name)
+  const info = OPERATORS.find((o) => o.name === operator.name)
+  const { level, elite, skillLevel, module } = withDefaultRequirements(
+    operator.requirements,
+    info?.rarity,
+  )
+  const skillCount = info
+    ? Math.max(getSkillCount(info), operator.skill ?? 1)
+    : 3
 
   return (
-    <div className="min-w-24 flex flex-col items-center">
-      <OperatorAvatar
-        id={info?.id}
-        rarity={info?.rarity}
-        className="w-16 h-16 mb-1"
-      />
-      <span className={clsx('mb-1 font-bold')}>
-        {useLocalizedOperatorName(name)}
-      </span>
-      <span className="text-xs text-zinc-300">
-        {t.models.operator.skill_number({ count: skill ?? 1 })}
-      </span>
+    <div className="relative flex items-start">
+      <div className="relative w-20">
+        <div className="relative rounded-lg overflow-hidden shadow-md">
+          <OperatorAvatar
+            id={info?.id}
+            rarity={info?.rarity}
+            className="w-20 h-20"
+            fallback={displayName}
+            sourceSize={96}
+          />
+          {module !== CopilotDocV1.Module.Default && (
+            <div
+              title={t.components.viewer.OperationViewer.module_title({
+                count: module,
+                name: getModuleName(module),
+              })}
+              className="absolute -bottom-1 right-1 font-serif font-bold text-lg text-white [text-shadow:0_0_3px_#a855f7,0_0_5px_#a855f7]"
+            >
+              {module === CopilotDocV1.Module.Original ? (
+                <Icon icon="small-square" />
+              ) : (
+                getModuleName(module)
+              )}
+            </div>
+          )}
+        </div>
+        <h4 className="mt-1 -mx-2 leading-4 font-semibold tracking-tighter text-center">
+          {displayName}
+        </h4>
+        {info && info.prof !== 'TOKEN' && (
+          <img
+            className="absolute top-0 right-0 w-5 h-5 p-px bg-gray-600 rounded-tr-md"
+            src={'/assets/prof-icons/' + info.prof + '.png'}
+            alt={info.prof}
+          />
+        )}
+      </div>
+      {version >= 2 && info?.prof !== 'TOKEN' && (
+        <>
+          <div className="absolute top-1 -left-5 ml-[2px] px-3 py-4 rounded-full bg-[radial-gradient(rgba(0,0,0,0.6)_10%,rgba(0,0,0,0.08)_30%,rgba(0,0,0,0)_45%)] pointer-events-none">
+            <img
+              className="w-7 h-6 object-contain"
+              src={getEliteIconUrl(elite)}
+              alt={t.models.operator.elite({ level: elite })}
+            />
+          </div>
+          <div className="absolute -top-2 -left-2 w-8 h-8 pr-px leading-7 rounded-full border-2 border-yellow-300 bg-black/50 text-lg text-white font-semibold text-center shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+            {level}
+          </div>
+        </>
+      )}
+
+      <ul className="flex flex-col gap-1 ml-1">
+        {Array.from({ length: skillCount }, (_, index) => {
+          const skillNumber = index + 1
+          const selected = operator.skill === skillNumber
+          return (
+            <li
+              key={index}
+              className={clsx(
+                'relative',
+                selected
+                  ? 'bg-purple-100 dark:bg-purple-900 dark:text-purple-200 text-purple-800'
+                  : 'bg-gray-300 dark:bg-gray-600 opacity-15 dark:opacity-25',
+              )}
+              title={t.models.operator.skill_number({ count: skillNumber })}
+            >
+              <div className="w-6 h-6 flex items-center justify-center font-bold text-xl border-2 border-current">
+                {version >= 2 ? (
+                  selected ? (
+                    skillLevel <= 7 ? (
+                      skillLevel
+                    ) : (
+                      <MasteryIcon
+                        className="w-4 h-4"
+                        mastery={skillLevel - 7}
+                        subClassName="fill-gray-300 dark:fill-gray-500"
+                      />
+                    )
+                  ) : undefined
+                ) : (
+                  skillNumber
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }
@@ -481,7 +632,9 @@ function OperationViewerInner({
           <NonIdealState
             icon="tree"
             title={t.components.viewer.OperationViewer.comments_closed}
-            description={t.components.viewer.OperationViewer.feel_the_silence}
+            description={
+              t.components.viewer.OperationViewer.comments_closed_note
+            }
           />
         ) : (
           <CommentArea operationId={operation.id} />
@@ -494,21 +647,15 @@ function OperationViewerInnerDetails({ operation }: { operation: Operation }) {
   const t = useTranslation()
   const [showOperators, setShowOperators] = useState(true)
   const [showActions, setShowActions] = useState(false)
+  const [gridMode, setGridMode] = useAtom(gridModeAtom)
 
   return (
     <div>
       <H4
-        className="inline-flex items-center cursor-pointer hover:text-violet-500"
+        className="inline-flex items-center cursor-pointer hover:opacity-80"
         onClick={() => setShowOperators((v) => !v)}
       >
         {t.components.viewer.OperationViewer.operators_and_groups}
-        <Tooltip2
-          className="!flex items-center"
-          placement="top"
-          content={t.components.viewer.OperationViewer.operator_group_tooltip}
-        >
-          <Icon icon="info-sign" size={12} className="text-zinc-500 ml-1" />
-        </Tooltip2>
         <Icon
           icon="chevron-down"
           className={clsx(
@@ -517,8 +664,21 @@ function OperationViewerInnerDetails({ operation }: { operation: Operation }) {
           )}
         />
       </H4>
+      <details className="inline">
+        <summary className="inline cursor-pointer">
+          <Icon icon="help" size={14} className="ml-2 mb-1 opacity-50" />
+        </summary>
+        <Callout intent="primary" icon={null} className="mb-4">
+          <p>
+            {t.components.viewer.OperationViewer.operators_and_groups_note.jsx({
+              operators: (s) => <b>{s}</b>,
+              groups: (s) => <b>{s}</b>,
+            })}
+          </p>
+        </Callout>
+      </details>
       <Collapse isOpen={showOperators}>
-        <div className="mt-2 flex flex-wrap -ml-4 gap-y-2">
+        <div className="mt-2 flex flex-wrap gap-6">
           {!operation.parsedContent.opers?.length &&
             !operation.parsedContent.groups?.length && (
               <NonIdealState
@@ -532,7 +692,11 @@ function OperationViewerInnerDetails({ operation }: { operation: Operation }) {
               />
             )}
           {operation.parsedContent.opers?.map((operator) => (
-            <OperatorCard key={operator.name} operator={operator} />
+            <OperatorCard
+              key={operator.name}
+              operator={operator}
+              version={operation.parsedContent.version}
+            />
           ))}
         </div>
         <div className="flex flex-wrap gap-4 mt-4">
@@ -542,12 +706,16 @@ function OperationViewerInnerDetails({ operation }: { operation: Operation }) {
               className="!p-2 flex flex-col items-center"
               key={group.name}
             >
-              <H6 className="text-gray-800">{group.name}</H6>
-              <div className="flex flex-wrap gap-y-2">
+              <H6 className="mb-3 text-gray-800">{group.name}</H6>
+              <div className="flex flex-wrap px-2 gap-6">
                 {group.opers
                   ?.filter(Boolean)
                   .map((operator) => (
-                    <OperatorCard key={operator.name} operator={operator} />
+                    <OperatorCard
+                      key={operator.name}
+                      operator={operator}
+                      version={operation.parsedContent.version}
+                    />
                   ))}
 
                 {group.opers?.filter(Boolean).length === 0 && (
@@ -561,26 +729,47 @@ function OperationViewerInnerDetails({ operation }: { operation: Operation }) {
         </div>
       </Collapse>
 
-      <H4
-        className="mt-6 inline-flex items-center cursor-pointer hover:text-violet-500"
-        onClick={() => setShowActions((v) => !v)}
-      >
-        {t.components.viewer.OperationViewer.action_sequence}
-        <Icon
-          icon="chevron-down"
-          className={clsx(
-            'ml-1 transition-transform',
-            showActions && 'rotate-180',
-          )}
-        />
-      </H4>
+      <div className="mt-6 flex items-center gap-4">
+        <H4
+          className="inline-flex items-center cursor-pointer hover:opacity-80 mb-0"
+          onClick={() => setShowActions((v) => !v)}
+        >
+          {t.components.viewer.OperationViewer.action_sequence}
+          <Icon
+            icon="chevron-down"
+            className={clsx(
+              'ml-1 transition-transform',
+              showActions && 'rotate-180',
+            )}
+          />
+        </H4>
+        {showActions && (
+          <Switch
+            checked={gridMode}
+            onChange={(e) => setGridMode(e.currentTarget.checked)}
+            label={t.components.viewer.OperationViewer.grid_mode}
+            className="mb-0"
+            innerLabel={t.components.viewer.OperationViewer.grid_off}
+            innerLabelChecked={t.components.viewer.OperationViewer.grid_on}
+          />
+        )}
+      </div>
       <Collapse isOpen={showActions}>
         {operation.parsedContent.actions?.length ? (
-          <div className="mt-2 flex flex-col pb-8">
-            {operation.parsedContent.actions.map((action, i) => (
-              <ActionCard action={action} key={i} />
-            ))}
-          </div>
+          <>
+            {gridMode ? (
+              <GridTimeline
+                actions={operation.parsedContent.actions}
+                groups={operation.parsedContent.groups}
+              />
+            ) : (
+              <div className="mt-2 flex flex-col pb-8">
+                {operation.parsedContent.actions.map((action, i) => (
+                  <ActionCard action={action} key={i} />
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <NonIdealState
             className="my-2"

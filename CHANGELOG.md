@@ -1,6 +1,32 @@
+## 2025-06-05
+
+- 优化了编辑器v2中的干员列表 [@Gemini2035](https://github.com/Gemini2035)
+- 修复了编辑器v2中部署方向在暗色模式下显示不正常的问题 [@czgaotian](https://github.com/czgaotian)
+- 修复了首页的作业列表未显示操作按钮的问题 [@guansss](https://github.com/guansss)
+- 广告更新
+
+## 2025-06-04
+
+- 修复了编辑器v2中修改难度后不显示的问题 [@guansss](https://github.com/guansss)
+- 修复了编辑器v2中从自动保存恢复后显示不正常的问题 [@guansss](https://github.com/guansss)
+- 修复了编辑器v2中干员模组被错误赋值的问题 [@guansss](https://github.com/guansss)
+- 修复了编辑器v2中干员列表无法回到顶部的问题 [@czgaotian](https://github.com/czgaotian)
+- 在编辑器v2中选择关卡后自动填写标题 [@guansss](https://github.com/guansss)
+- 修复了登录状态丢失的问题 [@guansss](https://github.com/guansss)
+- 将干员头像换成 webp 格式 [@guansss](https://github.com/guansss)
+- 优化了部分 UI [@guansss](https://github.com/guansss)
+
+## 2025-05-25
+
+- 添加干员和职业的英文名称 [@Constrat](https://github.com/Constrat)
+- 修复了作业列表里的自定义关卡显示不正常的问题 [@Constrat](https://github.com/Constrat)
+- 修复了部分文字的翻译显示不正常的问题 [@guansss](https://github.com/guansss)
+- 添加编辑器v2 [@guansss](https://github.com/guansss)
+- 优化首页搜索逻辑 [@ChingCdesu](https://github.com/ChingCdesu) [@Aliothmoon](https://github.com/Aliothmoon) [@dragove](https://github.com/dragove)
+
 ## 2025-05-11
 
-- 添加 i18n 及英文翻译 [@Constrat](https://github.com/Constrat) [@guansss](https://github.com/guansss)
+- 添加国际化及英文翻译 [@Constrat](https://github.com/Constrat) [@guansss](https://github.com/guansss)
 
 ## 2025-05-02
 

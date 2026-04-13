@@ -22,12 +22,15 @@ export const OperatorBackToTop: FC<OperatorBackToTopProp> = ({ toTop }) => {
     <Button
       minimal
       icon="symbol-triangle-up"
-      disabled={current < 3}
+      disabled={current < 2}
       title={
         t.components.editor.operator.sheet.sheetOperator.toolbox
           .OperatorBackToTop.back_to_top
       }
-      onClick={() => setPaginationFilter(defaultPagination)}
+      onClick={() => {
+        setPaginationFilter(defaultPagination)
+        toTop()
+      }}
     />
   )
 }

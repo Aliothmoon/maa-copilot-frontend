@@ -1,6 +1,5 @@
 import { Icon, IconSize, MenuItem } from '@blueprintjs/core'
 
-import clsx from 'clsx'
 import Fuse from 'fuse.js'
 import { useAtomValue } from 'jotai'
 import { useMemo } from 'react'
@@ -11,6 +10,7 @@ import { EditorFieldProps } from 'components/editor/EditorFieldProps'
 import { languageAtom, useTranslation } from '../../../i18n/i18n'
 import { CopilotDocV1 } from '../../../models/copilot.schema'
 import { OPERATORS } from '../../../models/operator'
+import { OperatorAvatar } from '../../OperatorAvatar'
 import { Suggest } from '../../Suggest'
 
 type OperatorInfo = (typeof OPERATORS)[number]
@@ -19,11 +19,8 @@ type PerformerItem = OperatorInfo | CopilotDocV1.Group
 const isOperator = (item: PerformerItem): item is OperatorInfo =>
   !!(item as OperatorInfo).alias
 
-const findOperatorIdByName = (name: string) =>
-  OPERATORS.find((el) => el.name === name)?.id ?? ''
-
 const createArbitraryOperator = (name: string): OperatorInfo => ({
-  id: findOperatorIdByName(name),
+  id: '',
   name,
   alias: '',
   alt_name: '',
@@ -167,76 +164,5 @@ export const EditorOperatorName = <T extends FieldValues>({
         placement: 'bottom-start',
       }}
     />
-  )
-}
-
-export const OperatorAvatar = ({
-  id,
-  name,
-  rarity = 0,
-  size,
-  className,
-}: {
-  id?: string
-  name?: string
-  rarity?: number
-  size?: 'small' | 'medium' | 'large'
-  className?: string
-}) => {
-  const foundId = (() => {
-    if (id) return id
-
-    if (name) {
-      const found = findOperatorIdByName(name)
-      if (found) return found
-    }
-
-    return ''
-  })()
-
-  const sizingClassName =
-    size &&
-    {
-      small: 'h-5 w-5',
-      medium: 'h-6 w-6',
-      large: 'h-8 w-8',
-    }[size]
-
-  const colorClassName =
-    rarity === 6
-      ? 'bg-orange-200 ring-orange-300'
-      : rarity === 5
-        ? 'bg-yellow-100 ring-yellow-200'
-        : rarity === 4
-          ? 'bg-purple-100 ring-purple-200'
-          : 'bg-slate-100 ring-slate-200'
-
-  const commonClassName =
-    'ring-inset ring-2 border-solid rounded-md object-cover'
-
-  return foundId ? (
-    <img
-      className={clsx(
-        sizingClassName,
-        colorClassName,
-        commonClassName,
-        className,
-      )}
-      src={'/assets/operator-avatars/' + foundId + '.png'}
-      alt={id}
-      loading="lazy"
-    />
-  ) : (
-    <div
-      className={clsx(
-        sizingClassName,
-        colorClassName,
-        commonClassName,
-        'flex items-center justify-center font-bold text-2xl text-slate-300 select-none',
-        className,
-      )}
-    >
-      ?
-    </div>
   )
 }
